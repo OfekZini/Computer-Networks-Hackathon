@@ -1,0 +1,15 @@
+what do you need to do?
+    client server app that implements network speed test
+
+order of operations:
+    1. server starts listening on ip address "172.1.0.4"
+        sends "offer" every second via udp
+        a. set up another server listening on ip address "172.1.0.88"
+
+    2. client asks the user for the next param
+        file size - str
+        tcp connection - int - counter for max connections to the server
+        udp connections - int - counter for max connections to the server
+
+
+

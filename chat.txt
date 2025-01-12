@@ -1,0 +1,147 @@
+import socket
+import time
+import os
+
+def start_server():
+    SERVER_IP = '172.1.0.4'
+    SERVER_PORT = 5000
+    BUFFER_SIZE = 4096
+    FILE_PATH = 'server_file.txt'
+
+    # Check if the file exists
+    if not os.path.exists(FILE_PATH):
+        print(f"File '{FILE_PATH}' does not exist. Create the file before starting the server.")
+        return
+
+    file_size = os.path.getsize(FILE_PATH)
+
+    # Create and bind server socket
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((SERVER_IP, SERVER_PORT))
+    server_socket.listen(1)
+    print(f"Server started, listening on IP address {SERVER_IP}")
+
+    while True:
+        client_socket, client_address = server_socket.accept()
+        print(f"Connection established with {client_address}")
+
+        # Send file size
+        client_socket.sendall(f"{file_size}\n".encode())
+
+        # Send file data
+        print("Starting file transfer...")
+        with open(FILE_PATH, 'rb') as file:
+            while chunk := file.read(BUFFER_SIZE):
+                client_socket.sendall(chunk)
+
+        print("File transfer completed.")
+        client_socket.close()
+
+
+def start_client(server_ip):
+    SERVER_PORT = 5000
+    BUFFER_SIZE = 4096
+
+    # Create client socket
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((server_ip, SERVER_PORT))
+
+    # Receive file size
+    file_size_data = b""
+    while True:
+        chunk = client_socket.recv(BUFFER_SIZE)
+        if b'\n' in chunk:
+            file_size_data += chunk[:chunk.index(b'\n')]
+            break
+        file_size_data += chunk
+
+    try:
+        file_size = int(file_size_data.decode())
+        print(f"File size to receive: {file_size} bytes")
+    except ValueError:
+        print("Invalid file size received.")
+        client_socket.close()
+        return
+
+    # Receive file data
+    received_data = b""
+    start_time = time.time()
+    while len(received_data) < file_size:
+        chunk = client_socket.recv(BUFFER_SIZE)
+        if not chunk:
+            break
+        received_data += chunk
+    end_time = time.time()
+
+    if len(received_data) == file_size:
+        print(f"File received successfully ({len(received_data)} bytes)")
+    else:
+        print(f"File transfer incomplete. Received {len(received_data)} bytes.")
+
+    # Calculate transfer rate
+    transfer_time = end_time - start_time
+    if transfer_time > 0:
+        transfer_rate = file_size / transfer_time
+        print(f"File transfer completed in {transfer_time:.2f} seconds.")
+        print(f"Transfer rate: {transfer_rate / 1024:.2f} KB/s")
+    else:
+        print("Transfer time too short to calculate bandwidth.")
+
+    client_socket.close()
+
+# Example usage:
+# Run `start_server()` in one script and `start_client('172.1.0.4')` in another.
+
+
+=====================If the client buffer size if different from the server buffer size use this code ======================
+
+def start_client(server_ip):
+    SERVER_PORT = 5000
+    METADATA_BUFFER_SIZE = 128  # Small buffer for metadata like file size
+
+    # Create client socket
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((server_ip, SERVER_PORT))
+
+    # Receive file size
+    file_size_data = b""
+    while True:
+        chunk = client_socket.recv(METADATA_BUFFER_SIZE)
+        if b'\n' in chunk:
+            file_size_data += chunk[:chunk.index(b'\n')]
+            break
+        file_size_data += chunk
+
+    try:
+        file_size = int(file_size_data.decode())
+        print(f"File size to receive: {file_size} bytes")
+    except ValueError:
+        print("Invalid file size received.")
+        client_socket.close()
+        return
+
+    # Dynamically receive file data
+    received_data = b""
+    start_time = time.time()
+    while len(received_data) < file_size:
+        chunk = client_socket.recv(4096)  # Use a standard size for each receive
+        if not chunk:
+            break
+        received_data += chunk
+    end_time = time.time()
+
+    if len(received_data) == file_size:
+        print(f"File received successfully ({len(received_data)} bytes)")
+    else:
+        print(f"File transfer incomplete. Received {len(received_data)} bytes.")
+
+    # Calculate transfer rate
+    transfer_time = end_time - start_time
+    if transfer_time > 0:
+        transfer_rate = file_size / transfer_time
+        print(f"File transfer completed in {transfer_time:.2f} seconds.")
+        print(f"Transfer rate: {transfer_rate / 1024:.2f} KB/s")
+    else:
+        print("Transfer time too short to calculate bandwidth.")
+
+    client_socket.close()
