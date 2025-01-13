@@ -13,3 +13,22 @@ order of operations:
 
 
 
+the client should open a thread for each request, and operate them all in parallel.
+This means that if you are asked for 3 TCP connections and 6 UDP connections, you should create 9 threads and 9 parallel connections to the server
+
+The only requirement is that the broadcast port should be a constant in your code that is easy to change (i.e. not hard coded in 5 different places).
+During testing the course staff may ask you to modify the port.
+
+There is nothing stopping you from running multiple servers on the same machine, but we will not be testing this
+
+The client should make all of its connections to the single server, and there is no more user interaction after the user is asked for file size, TCP count and UDP count.
+
+
+the client immediately returns to looking for a server, without interacting with the user. The client and the server never stop
+
+
+client states:
+1. init
+2. looking for server
+3. send requests (1 for each thread/ connection)
+4. return speedtest and
