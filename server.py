@@ -3,86 +3,190 @@ import struct
 import threading
 import time
 
-MAGIC_COOKIE = 0xabcddcba
-OFFER_MESSAGE_TYPE = 0x2
-UDP_PORT = 12345
-TCP_PORT = 54321
+class Server:
+    def __init__(self,server_ip = '0.0.0.0', udp_offer_port=12345, udp_port=4444 , tcp_port = 54321):
+        self.server_ip = server_ip
+        self.udp_port = udp_port
+        self.udp_offer_port = udp_offer_port
+        self.tcp_port = tcp_port
+        self.magic_cookie = 0xabcddcba
+        self.offer_message_type = 0x2
+        self.request_message_type = 0x3
 
 
-# Server code
-def udp_server():
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)  # Enable broadcasting
-    server_socket.bind(("", UDP_PORT))
+    # Server code
+    def udp_offers_server(self):
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)  # Enable broadcasting
+        server_socket.bind(("", self.udp_offer_port))
 
-    print(f"Server is listening on UDP port {UDP_PORT}")
+        print(f"Server is listening on UDP port {self.udp_port}")
 
-    while True:
-        # Create the offer message
-        offer_message = struct.pack('!IBHH', MAGIC_COOKIE, OFFER_MESSAGE_TYPE, UDP_PORT, TCP_PORT)
+        while True:
+            # Create the offer message
+            offer_message = struct.pack('!IBHH', self.magic_cookie, self.offer_message_type, self.udp_port, self.tcp_port)
 
-        # Send the offer message every 1 second
-        server_socket.sendto(offer_message, ('<broadcast>', UDP_PORT))
-        print("Sent offer message")
-        time.sleep(1)
-
-
-
-# Run server and client on different threads
-server_thread = threading.Thread(target=udp_server)
+            # Send the offer message every 1 second
+            server_socket.sendto(offer_message, ('<broadcast>', self.udp_offer_port))
+            print("Sent offer message")
+            time.sleep(3)
 
 
+    def requests_udp_listener(self):
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        server_socket.bind((self.server_ip, self.udp_port))
+        print(f"Server listening to UDP on {self.server_ip}:{self.udp_port}")
+
+        while True:
+            data, addr = server_socket.recvfrom(13)
+            print(f"Received data from {addr}")
+            client_thread = threading.Thread(target=self.handle_udp_client, args=(data, addr, server_socket))
+            client_thread.start()
+
+    def handle_udp_client(self, data, addr, server_socket):
+        if len(data) < 13:
+            print("Incomplete data received from", addr)
+            return
+
+        magic_cookie, message_type, file_size = struct.unpack('!IBQ', data)
+
+        if magic_cookie != self.magic_cookie:
+            print("Invalid magic cookie from", addr)
+            return
+
+        if message_type != self.request_message_type:
+            print("Invalid message type from", addr)
+            return
+
+        print(f"Received request from {addr}: Magic Cookie: {hex(magic_cookie)}, Message Type: {message_type}, File Size: {file_size} bytes")
+
+        total_size = file_size
+        bytes_sent = 0
+        data_chunk = b'0' * 1024
+
+        while bytes_sent < total_size:
+            if total_size - bytes_sent < len(data_chunk):
+                data_chunk = b'0' * (total_size - bytes_sent)
 
 
+            print(f"Sending chunk of size {len(data_chunk)} to {addr}")
+            server_socket.sendto(data_chunk, addr)
+            bytes_sent += len(data_chunk)
+            print(f"Sent {bytes_sent}/{total_size} bytes to {addr}")
 
-def send_large_data(conn, data_chunk):
-    total_size = 1 * 1024 * 1024 * 1024  # 1 GB
-    bytes_sent = 0
-    chunk_size = len(data_chunk)
+    def requests_tcp_listener(self):
+        request_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        request_server.bind((self.server_ip, self.tcp_port))
+        request_server.listen(5)
+        print(f"Server listening to TCP on {self.server_ip}:{self.tcp_port}")
 
-    while bytes_sent < total_size:
-        if bytes_sent + chunk_size > total_size:
-            # Adjust the final chunk to not exceed the 1 GB limit
-            data_chunk = data_chunk[:total_size - bytes_sent]
+        while True:
+            client_socket, addr = request_server.accept()
+            print(f"Connection from {addr} established.")
 
-        conn.sendall(data_chunk.encode('utf-8'))
-        bytes_sent += len(data_chunk)
+            # Create a new thread for each client
+            client_thread = threading.Thread(target=self.handle_tcp_client, args=(client_socket,addr))
+            client_thread.start()
+            client_thread.join()
 
-        # Optional: Break the loop if the string element is empty or None
-        if not data_chunk:
-            break
-
-def start_server(host='localhost', port=4500):
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-        server_socket.bind((host, port))
-        server_socket.listen()
-        print(f"Server listening on {host}:{port}")
-
-        conn, addr = server_socket.accept()
-        data_chunk = '0'*1024
-        file_size =  1 * 1024 * 1024 * 1024
-        with conn:
+    def handle_tcp_client(self,client_socket , addr):
+        with client_socket:
             print(f"Connected by {addr}")
-            conn.sendall(str(file_size).encode())  # Send the file size
-            start_time = time.time()
-            send_large_data(conn, data_chunk)
-            end_time = time.time()
-            total_time = end_time - start_time
-            bandwidth = file_size / total_time  # in bytes per second
 
-            print(f"File sent successfully in {total_time:.2f} seconds")
-            print(f"Bandwidth: {bandwidth:.2f} bytes/sec")
+            # Receive the data in small chunks
+            data = client_socket.recv(13)  # Total expected size is 13 bytes
+
+            if len(data) < 13:
+                print("Incomplete data received")
+                return
+
+            # Unpack the data
+            magic_cookie, message_type, file_size = struct.unpack('!IBQ', data)
+
+            # Validate magic cookie and message type
+            if magic_cookie != 0xabcddcba:
+                print("Invalid magic cookie. Rejecting message.")
+                return
+
+            if message_type != 0x3:
+                print("Invalid message type. Rejecting message.")
+                return
+
+            print(
+                f"Received request: Magic Cookie: {hex(magic_cookie)}, Message Type: {message_type}, File Size: {file_size} bytes")
+            self.send_large_data_over_tcp(conn=client_socket , file_size=file_size)
+
+
+    def send_large_data_over_tcp(self, conn, file_size):
+        total_size =  file_size
+        bytes_sent = 0
+        data_chunk = b'0' * 1024
+        chunk_size = len(data_chunk)
+
+        # start_time = time.time()
+        while bytes_sent < total_size:
+            if total_size - bytes_sent < chunk_size :
+                # Adjust the final chunk to not exceed the 1 GB limit
+                data_chunk = b'0' * (total_size - bytes_sent)
+
+            conn.sendall(data_chunk)
+            print(f"sent data chunk {bytes_sent}")
+            bytes_sent += len(data_chunk)
+
+            # Optional: Break the loop if the string element is empty or None
+            if not data_chunk:
+                break
+
+        def handle_udp_client(self, client_socket, addr):
+            with client_socket:
+                print(f"Connected by {addr}")
+
+                # Receive the data in small chunks
+                data = client_socket.recv(13)  # Total expected size is 13 bytes
+
+                if len(data) < 13:
+                    print("Incomplete data received")
+                    return
+
+                # Unpack the data
+                magic_cookie, message_type, file_size = struct.unpack('!IBQ', data)
+
+                # Validate magic cookie and message type
+                if magic_cookie != 0xabcddcba:
+                    print("Invalid magic cookie. Rejecting message.")
+                    return
+
+                if message_type != 0x3:
+                    print("Invalid message type. Rejecting message.")
+                    return
+
+                print(
+                    f"Received request: Magic Cookie: {hex(magic_cookie)}, Message Type: {message_type}, File Size: {file_size} bytes")
+                self.send_large_data_over_tcp(conn=client_socket, file_size=file_size)
+
+
+    def start(self):
+        ### The Server Request Listener
+        tcp_request_server_thread = threading.Thread(target=self.requests_tcp_listener)
+        tcp_request_server_thread.start()
+        time.sleep(1)  # Give the server time to start
+
+        udp_request_server_thread = threading.Thread(target=self.requests_udp_listener)
+        udp_request_server_thread.start()
+        time.sleep(1)  # Give the server time to start
+
+        # The Offers publisher
+        offer_server_thread = threading.Thread(target=self.udp_offers_server)
+        offer_server_thread.start()
+        time.sleep(1)  # Give the server time to start
+
+        tcp_request_server_thread.join()
+        udp_request_server_thread.join()
+        offer_server_thread.join()
 
 
 if __name__ == "__main__":
-
-
-    server_thread = threading.Thread(target=udp_server)
-    server_thread.start()
-    time.sleep(1)  # Give the server time to start
-    server_thread.join()
-
-
-   ### start_server()
+    server = Server()
+    server.start()
