@@ -2,6 +2,7 @@ import socket
 import struct
 import threading
 import time
+from termcolor import colored
 
 
 class Client:
@@ -18,9 +19,10 @@ class Client:
 
     def get_user_input(self):
         # Get user inputs
-        self.file_size = int(input("Enter the file size (in MB): "))
-        self.tcp_connections = int(input("Enter the number of TCP connections: "))
-        self.udp_connections = int(input("Enter the number of UDP connections: "))
+        print(colored("Client started, listening for offer requests...","green"))
+        self.file_size = int(input(colored("Enter the file size (in MB): ","green")))
+        self.tcp_connections = int(input(colored("Enter the number of TCP connections: ",'green')))
+        self.udp_connections = int(input(colored("Enter the number of UDP connections: ","green")))
 
     # offer listener
     def offer_listener(self):
@@ -29,11 +31,12 @@ class Client:
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         client_socket.bind(("", self.udp_port))
 
-        print(f"Client is listening on UDP port {self.udp_port}")
+        print(colored(f"Client is listening on UDP port {self.udp_port}","cyan"))
 
         while True:
             data, addr = client_socket.recvfrom(1024)
-            print(f"Received data from {addr} {data}")
+            # print(f"Received data from {addr} {data}")
+            print(colored(f"Received offer from {addr}","green"))
 
             # Unpack the received message
             if len(data) >= 9:
@@ -47,29 +50,31 @@ class Client:
                     print(f"Received valid offer message: UDP Port: {server_udp_port}, TCP Port: {server_tcp_port}")
                     self.start_requests(server_ip_address, server_tcp_port, server_udp_port)
                 else:
-                    print("Invalid message received")
+                    print(colored("Invalid message received","red"))
             else:
-                print("Incomplete message received")
+                print(colored("Incomplete message received","red"))
 
     def start_requests(self, server_ip_address, server_tcp_port, server_udp_port):
+        print(colored("Client started, listening for offer requests...","green"))
         threads = []
         # Create threads for TCP connections
         for i in range(self.tcp_connections):
-            thread = threading.Thread(target=self.receive_file_over_tcp, args=(server_ip_address, server_tcp_port))
+            thread = threading.Thread(target=self.receive_file_over_tcp, args=(i,server_ip_address, server_tcp_port))
             threads.append(thread)
             thread.start()
 
         # Create threads for UDP connections
         for i in range(self.udp_connections):
-            thread = threading.Thread(target=self.receive_file_over_udp, args=(server_ip_address, server_udp_port))
+            thread = threading.Thread(target=self.receive_file_over_udp, args=(i,server_ip_address, server_udp_port))
             threads.append(thread)
             thread.start()
 
         # Wait for all threads to finish
         for thread in threads:
             thread.join()
+        print(colored("All transfers complete, listening to offer requests","green"))
 
-    def receive_file_over_tcp(self, host='localhost', port=4500):
+    def receive_file_over_tcp(self, conn_num,host='localhost', port=4500, ):
 
        ### request_file_size = self.file_size + '\n'
         request_message = struct.pack('!IBQ', self.magic_cookie, self.request_message_type, self.file_size)
@@ -98,10 +103,10 @@ class Client:
 
             end_time = time.time()
             total_time = end_time - start_time
+            print(colored(f"TCP transfer #{conn_num} finished, total time: {total_time} seconds, total speed:{file_size / total_time} bits/second","light_blue"))
+            # print(f"File received successfully in {total_time:.2f} seconds")
 
-            print(f"File received successfully in {total_time:.2f} seconds")
-
-    def receive_file_over_udp(self, host='localhost', port=4500):
+    def receive_file_over_udp(self, conn_num ,host='localhost', port=4500):
         request_message = struct.pack('!IBQ', self.magic_cookie, self.request_message_type, self.file_size)
 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_client_socket:
@@ -125,8 +130,9 @@ class Client:
             stop_time = time.time()
             total_time = stop_time - start_time
 
-            print(f"File received successfully in {total_time:.2f} seconds")
-            print(f"Total bytes received: {total_bytes_received}/{self.file_size}")
+            print(colored(f"UDP transfer #{conn_num} finished, total time: {total_time} seconds, total speed: {self.file_size / total_time} bits/second, percentage of packets received successfully: {total_bytes_received}/{self.file_size}%","light_magenta"))
+            # print(f"File received successfully in {total_time:.2f} seconds")
+            # print(f"Total bytes received: {total_bytes_received}/{self.file_size}")
 
         # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as tcp_client_socket:
         #     tcp_client_socket.connect((host, port))
