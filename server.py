@@ -80,22 +80,26 @@ class Server:
         current_segment = 1
         data_chunk = b'0' * 1024
 
-        while bytes_sent < total_size:
-            if total_size - bytes_sent < len(data_chunk):
-                data_chunk = b'0' * (total_size - bytes_sent)
 
-            payload_msg = struct.pack(
-                '!IBQQ1024s',  # Updated format
-                self.magic_cookie,  # Magic cookie (4 bytes)
-                self.payload_message_type,  # Message type (1 byte)
-                total_segments,  # Total segment count (8 bytes)
-                current_segment,  # Current segment count (8 bytes)
-                data_chunk  # Payload (1024 bytes)
-            )
+        try:
+            while bytes_sent < total_size:
+                if total_size - bytes_sent < len(data_chunk):
+                    data_chunk = b'0' * (total_size - bytes_sent)
 
-            server_socket.sendto(payload_msg, addr)
-            bytes_sent += len(data_chunk)
-            current_segment += 1
+                payload_msg = struct.pack(
+                    '!IBQQ1024s',  # Updated format
+                    self.magic_cookie,  # Magic cookie (4 bytes)
+                    self.payload_message_type,  # Message type (1 byte)
+                    total_segments,  # Total segment count (8 bytes)
+                    current_segment,  # Current segment count (8 bytes)
+                    data_chunk  # Payload (1024 bytes)
+                )
+
+                server_socket.sendto(payload_msg, addr)
+                bytes_sent += len(data_chunk)
+                current_segment += 1
+        except ConnectionResetError as e:
+            print(colored("Connection error: {e}", "red"))
 
     def requests_tcp_listener(self):
         request_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -150,7 +154,7 @@ class Server:
                     # Adjust the final chunk to not exceed the 1 GB limit
                     data_chunk = b'0' * (total_size - bytes_sent)
 
-                payload_msg = struct.pack('!IB1024s', self.magic_cookie, self.payload_message_type, data_chunk) #send data 
+                payload_msg = struct.pack('!IB1024s', self.magic_cookie, self.payload_message_type, data_chunk) #send data
                 conn.sendall(payload_msg)
                 bytes_sent += len(data_chunk)
 
