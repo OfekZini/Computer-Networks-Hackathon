@@ -5,5 +5,7 @@ PAYLOAD_MESSAGE_TYPE = 0x4
 UDP_OFFER_PORT = 12345 # Broadcast UDP port
 TCP_PORT = 54321 # TCP connection port
 UDP_PORT = 4444 # UDP connection Port
+SERVER_IP = '172.20.10.2'
+DEF_IP = '0.0.0.0'
 
 broadcast_time = 3
