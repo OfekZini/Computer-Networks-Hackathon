@@ -27,6 +27,14 @@ class Server:
 
     # Server code
     def udp_offers_server(self):
+        """Periodically broadcasts a UDP offer message."""
+        # with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        #     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        #     offer_message = struct.pack('!IBHH', MAGIC_COOKIE, OFFER_MESSAGE_TYPE, UDP_OFFER_PORT, TCP_PORT)
+        #     print(f"Broadcasting offers on UDP port {self.udp_port}...")
+        #     while True:
+        #         sock.sendto(offer_message, ('<broadcast>', self.udp_offer_port))
+        #         time.sleep(1)
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
@@ -71,7 +79,7 @@ class Server:
             print(colored(f"Invalid message type from {addr}","red"))
             return
 
-        print(f"Received request from {addr}: Magic Cookie: {hex(magic_cookie)}, Message Type: {message_type}, File Size: {file_size} bytes")
+        # print(f"Received request from {addr}: Magic Cookie: {hex(magic_cookie)}, Message Type: {message_type}, File Size: {file_size} bytes")
 
 
         total_size = file_size
@@ -95,11 +103,12 @@ class Server:
                 data_chunk  # Payload (1024 bytes)
             )
 
-            print(f"Sending chunk of size {len(data_chunk)} to {addr}")
+            # print(f"Sending chunk of size {len(data_chunk)} to {addr}")
             # server_socket.sendto(data_chunk, addr)
             server_socket.sendto(payload_msg, addr)
             bytes_sent += len(data_chunk)
-            print(f"Sent {bytes_sent}/{total_size} bytes to {addr}")
+            current_segment += 1
+            # print(f"Sent {bytes_sent}/{total_size} bytes to {addr}")
 
     def requests_tcp_listener(self):
         request_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -109,7 +118,7 @@ class Server:
 
         while True:
             client_socket, addr = request_server.accept()
-            print(colored("Connection from {addr} established.","light_blue"))
+            print(colored(f"Connection from {addr} established.","light_blue"))
 
             # Create a new thread for each client
             client_thread = threading.Thread(target=self.handle_tcp_client, args=(client_socket,addr))
@@ -139,8 +148,8 @@ class Server:
                 print(colored("Invalid message type. Rejecting message.","red"))
                 return
 
-            print(
-                f"Received request: Magic Cookie: {hex(magic_cookie)}, Message Type: {message_type}, File Size: {file_size} bytes")
+            # print(
+            #     f"Received request: Magic Cookie: {hex(magic_cookie)}, Message Type: {message_type}, File Size: {file_size} bytes")
             self.send_large_data_over_tcp(conn=client_socket , file_size=file_size)
 
 
