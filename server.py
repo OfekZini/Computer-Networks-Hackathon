@@ -52,13 +52,13 @@ class Server:
 
         while True:
             data, addr = server_socket.recvfrom(13)
-            print(colored(f"Received data from {addr}","light_blue"))
+            print(colored(f"Received request from {addr}","light_blue"))
             client_thread = threading.Thread(target=self.handle_udp_client, args=(data, addr, server_socket))
             client_thread.start()
 
     def handle_udp_client(self, data, addr, server_socket):
         if len(data) < 13:
-            print(colored(f"Incomplete data received from{addr}","red"))
+            print(colored(f"Incomplete request received from{addr}","red"))
             return
 
         magic_cookie, message_type, file_size = struct.unpack('!IBQ', data)
@@ -100,6 +100,9 @@ class Server:
                 current_segment += 1
         except ConnectionResetError as e:
             print(colored("Connection error: {e}", "red"))
+        except OSError as e:
+            print(colored("OS error: {e}", "red"))
+
 
     def requests_tcp_listener(self):
         request_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
