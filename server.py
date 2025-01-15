@@ -118,8 +118,6 @@ class Server:
 
     def handle_tcp_client(self,client_socket , addr):
         with client_socket:
-            print(colored(f"Connected by {addr}","light_blue"))
-
             # Receive the data in small chunks
             data = client_socket.recv(13)  # Total expected size is 13 bytes
 
