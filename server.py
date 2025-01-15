@@ -144,20 +144,21 @@ class Server:
         data_chunk = b'0' * 1024
         chunk_size = len(data_chunk)
 
-        # start_time = time.time()
-        while bytes_sent < total_size:
-            if total_size - bytes_sent < chunk_size :
-                # Adjust the final chunk to not exceed the 1 GB limit
-                data_chunk = b'0' * (total_size - bytes_sent)
+        try:
+            while bytes_sent < total_size:
+                if total_size - bytes_sent < chunk_size :
+                    # Adjust the final chunk to not exceed the 1 GB limit
+                    data_chunk = b'0' * (total_size - bytes_sent)
 
-            # payload_msg =  struct.pack('!IB',self.magic_cookie, self.payload_message_type) + data_chunk
-            payload_msg = struct.pack('!IB1024s', self.magic_cookie, self.payload_message_type, data_chunk)
-            conn.sendall(payload_msg)
-            bytes_sent += len(data_chunk)
+                payload_msg = struct.pack('!IB1024s', self.magic_cookie, self.payload_message_type, data_chunk) #send data 
+                conn.sendall(payload_msg)
+                bytes_sent += len(data_chunk)
 
-            # Optional: Break the loop if the string element is empty or None
-            if not data_chunk:
-                break
+                # Optional: Break the loop if the string element is empty or None
+                if not data_chunk:
+                    break
+        except ConnectionError as e:
+            print(colored("Connection error: {e}","red"))
 
     def start(self):
         ### The Server Request Listener
