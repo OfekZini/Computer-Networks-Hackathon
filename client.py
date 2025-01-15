@@ -182,7 +182,7 @@ class Client:
                         # print(f"Received segment {current_segment}/{total_segments} from {server_addr}")
 
                     except socket.timeout:
-                        print("Timeout: No response received.")
+                        print(f"Timeout: No response received on UDP transfer #{conn_num + 1}.")
                         break
 
             stop_time = time.time()

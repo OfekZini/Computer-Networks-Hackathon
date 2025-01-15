@@ -98,10 +98,11 @@ class Server:
                 server_socket.sendto(payload_msg, addr)
                 bytes_sent += len(data_chunk)
                 current_segment += 1
+                time.sleep(0.003)  # 3 millisecond delay
         except ConnectionResetError as e:
             print(colored("Connection error: {e}", "red"))
         except OSError as e:
-            print(colored("OS error: {e}", "red"))
+            print(colored(f"OS error: {e}", "red"))
 
 
     def requests_tcp_listener(self):
