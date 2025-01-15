@@ -61,27 +61,6 @@ class Client:
                     server_udp_port = udp_port
                     self.start_requests(server_ip_address, server_tcp_port, server_udp_port)
 
-        # UDP_PORT = UDP_OFFER_PORT
-        # # print(f"{Colors.INFO}{Colors.BOLD}INFO: Listening for server offers on UDP port {UDP_PORT}{Colors.RESET}")
-        # print(f"Client started, listening for offer requests...")
-        #
-        # with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        #     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        #     sock.bind(('', UDP_PORT))
-        #
-        #     while True:
-        #         try:
-        #             data, addr = sock.recvfrom(1024)
-        #             if len(data) >= 9:
-        #                 magic_cookie, msg_type, udp_port, tcp_port = struct.unpack('!IbHH', data)
-        #                 if magic_cookie == MAGIC_COOKIE and msg_type == OFFER_MESSAGE_TYPE:
-        #                     print(f"INFO: Received offer from {addr[0]}:{udp_port}")
-        #                     return addr[0], udp_port, tcp_port
-        #         except struct.error:
-        #             print(f"WARNING: Received an invalid packet. Ignoring...")
-        #         except Exception as e:
-        #             print(f"ERROR: {e}")
-        #
 
 
     def start_requests(self, server_ip_address, server_tcp_port, server_udp_port):
@@ -129,11 +108,6 @@ class Client:
                             print("Connection closed unexpectedly.")
                             return
                         header += chunk
-                    # header = tcp_client_socket.recv(header_size)
-                    # if file_size - total_received < 1024: # if we are not in the last packet
-                    #     if len(header) < header_size:
-                    #         print(colored("Error: Incomplete header received. Terminating connection.","red"))
-                    #         break
 
                     try:
                         magic_cookie, message_type, data_chunk = struct.unpack('!IB1024s', header)
@@ -141,11 +115,6 @@ class Client:
                     except struct.error:
                         print(colored("Error unpacking header: {e}","red"))
                         break
-                    # if not data_chunk:
-                    #     break
-
-                    # header = data_chunk[:header_size]
-                    # magic_cookie, message_type = struct.unpack('!IB', header)
 
                     if magic_cookie != self.magic_cookie: # validate cookie
                         print(f"my cookie: {self.magic_cookie}")
@@ -165,59 +134,6 @@ class Client:
             total_time = end_time - start_time
             print(colored(
                 f"TCP transfer #{conn_num + 1} finished, total time: {total_time} seconds, total speed:{file_size / total_time} bits/second","light_blue"))
-            # print(f"File received successfully in {total_time:.2f} seconds")
-
-    # def receive_file_over_udp(self, conn_num ,host='localhost', port=4500):
-    #     # build a request message
-    #     request_message = struct.pack('!IBQ', self.magic_cookie, self.request_message_type, self.file_size)
-    #
-    #     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_client_socket:
-    #         # Send the request message to the server
-    #         udp_client_socket.sendto(request_message, (host, port))
-    #         print(f"Request sent to {host}:{port}") # print for my self need to be deleted
-    #
-    #         total_bytes_received = 0 # init size received
-    #         header_size = struct.calcsize('!IB1024s')  # Size of the header
-    #         start_time = time.time()
-    #
-    #         with open('received_file_udp.txt', 'wb') as f:
-    #             while total_bytes_received < self.file_size:
-    #                 udp_client_socket.settimeout(1)  # Set timeout for receiving data
-    #                 try:
-    #                     # Receive data from the server
-    #                     # data, server_addr = udp_client_socket.recvfrom(1024)
-    #                     header = udp_client_socket.recv(header_size)
-    #                     magic_cookie, message_type, data_chunk = struct.unpack('!IB1024s', header) #unpack header
-    #                     data_chunk = data_chunk.decode('utf-8').rstrip('\x00') # decode string by len
-    #
-    #                     # header = data[:header_size]
-    #                     # magic_cookie, message_type = struct.unpack('!IB', header)
-    #
-    #                     if magic_cookie != self.magic_cookie: # validate cookie
-    #                         print("Invalid header received. Terminating connection.")
-    #                         break
-    #                     if message_type != self.payload_message_type: # validate type
-    #                         print("Invalid payload received. Terminating connection.")
-    #                         break
-    #
-    #                     payload = data_chunk.encode('utf-8') # encode string
-    #                     f.write(payload)
-    #                     total_bytes_received += len(payload)
-    #
-    #                 except socket.timeout:
-    #                     print(colored("No response received. Exiting.","red")) # a print for my self, maybe delete it...
-    #                     break
-    #
-    #         stop_time = time.time()
-    #         total_time = stop_time - start_time
-    #         percentage_received = total_bytes_received / self.file_size * 100
-    #
-    #         print(colored(
-    #             f"UDP transfer #{conn_num + 1} finished, total time: {total_time} seconds, total speed: {self.file_size / total_time} bits/second, percentage of packets received successfully: {percentage_received}%","light_magenta"))
-    #
-    #
-    #         # print(f"File received successfully in {total_time:.2f} seconds")
-    #         # print(f"Total bytes received: {total_bytes_received}/{self.file_size}")
 
     def receive_file_over_udp(self, conn_num, host='localhost', port=4500):
         # Build a request message
@@ -228,11 +144,13 @@ class Client:
             udp_client_socket.sendto(request_message, (host, port))
             print(f"Request sent to {host}:{port}")
 
-            udp_client_socket.settimeout(5)  # Increase timeout for response
+            udp_client_socket.settimeout(1)  # Increase timeout for response
             total_bytes_received = 0
             header_size = struct.calcsize('!IBQQ')  # Header size
             max_payload_size = 1024  # Payload size
             buffer_size = header_size + max_payload_size
+            total_segments = (self.file_size + max_payload_size - 1) // max_payload_size
+            recceived_segments = 0
             start_time = time.time()
 
             with open('received_file_udp.txt', 'wb') as f:
@@ -255,6 +173,8 @@ class Client:
                             print("Invalid packet received")
                             continue
 
+                        recceived_segments += 1
+
                         # Write the payload to the file
                         f.write(payload.rstrip(b'\x00'))  # Strip padding
                         total_bytes_received += len(payload.rstrip(b'\x00'))
@@ -266,8 +186,11 @@ class Client:
                         break
 
             stop_time = time.time()
+            total_time = stop_time - start_time
+            receive_percentage = total_segments / recceived_segments * 100
             print(
-                f"File transfer complete: {total_bytes_received}/{self.file_size} bytes received in {stop_time - start_time:.2f} seconds.")
+                f"UDP transfer #{conn_num + 1} finished, total time: {total_time} seconds, total speed: {total_bytes_received}/{total_time} bits/second. percentage of packets received successfully: {receive_percentage}%”")
+
 
     def start(self):
         self.get_user_input() # init user and get num of connections

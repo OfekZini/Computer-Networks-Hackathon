@@ -28,13 +28,6 @@ class Server:
     # Server code
     def udp_offers_server(self):
         """Periodically broadcasts a UDP offer message."""
-        # with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        #     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        #     offer_message = struct.pack('!IBHH', MAGIC_COOKIE, OFFER_MESSAGE_TYPE, UDP_OFFER_PORT, TCP_PORT)
-        #     print(f"Broadcasting offers on UDP port {self.udp_port}...")
-        #     while True:
-        #         sock.sendto(offer_message, ('<broadcast>', self.udp_offer_port))
-        #         time.sleep(1)
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
@@ -49,7 +42,6 @@ class Server:
 
             # Send the offer message every 1 second
             server_socket.sendto(offer_message, ('<broadcast>', self.udp_offer_port))
-            print("Sent offer message")
             time.sleep(broadcast_time)
 
 
@@ -79,9 +71,8 @@ class Server:
             print(colored(f"Invalid message type from {addr}","red"))
             return
 
-        # print(f"Received request from {addr}: Magic Cookie: {hex(magic_cookie)}, Message Type: {message_type}, File Size: {file_size} bytes")
 
-
+        # set variables for sending data
         total_size = file_size
         bytes_sent = 0
         chunk_size = 1024
@@ -93,7 +84,6 @@ class Server:
             if total_size - bytes_sent < len(data_chunk):
                 data_chunk = b'0' * (total_size - bytes_sent)
 
-            # payload_msg = struct.pack('!IB1024s', self.magic_cookie, self.payload_message_type, data_chunk)
             payload_msg = struct.pack(
                 '!IBQQ1024s',  # Updated format
                 self.magic_cookie,  # Magic cookie (4 bytes)
@@ -103,12 +93,9 @@ class Server:
                 data_chunk  # Payload (1024 bytes)
             )
 
-            # print(f"Sending chunk of size {len(data_chunk)} to {addr}")
-            # server_socket.sendto(data_chunk, addr)
             server_socket.sendto(payload_msg, addr)
             bytes_sent += len(data_chunk)
             current_segment += 1
-            # print(f"Sent {bytes_sent}/{total_size} bytes to {addr}")
 
     def requests_tcp_listener(self):
         request_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -148,8 +135,6 @@ class Server:
                 print(colored("Invalid message type. Rejecting message.","red"))
                 return
 
-            # print(
-            #     f"Received request: Magic Cookie: {hex(magic_cookie)}, Message Type: {message_type}, File Size: {file_size} bytes")
             self.send_large_data_over_tcp(conn=client_socket , file_size=file_size)
 
 
